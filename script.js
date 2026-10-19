@@ -73,76 +73,205 @@
   route(false);
   if (/^#work-/.test(location.hash) && work) setTimeout(function () { work.scrollIntoView(); }, 0);
 
-  /* Particles: soft floating dots in the navy sections. Click near a dot for a burst. */
+  /* Particles: floating dots with mouse attraction, connection lines and click bursts. */
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function particles(canvas) {
     var ctx = canvas.getContext && canvas.getContext('2d');
     if (!ctx) return;
     var host = canvas.parentElement;
     var dots = [], bursts = [], w = 0, h = 0, dpr = 1, raf = 0, visible = true;
+    var mouse = { x: 0, y: 0, active: false };
+
+    function makeDot() {
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: 1.4 + Math.random() * 2.2
+      };
+    }
+
     function size() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = host.clientWidth; h = host.clientHeight;
-      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+      w = host.clientWidth;
+      h = host.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      var n = Math.max(18, Math.min(70, Math.round(w * h / 14000)));
-      while (dots.length < n) dots.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35, r: 1.2 + Math.random() * 1.8 });
+      var n = Math.max(22, Math.min(85, Math.round(w * h / 12000)));
+      while (dots.length < n) dots.push(makeDot());
       dots.length = n;
+      for (var i = 0; i < dots.length; i++) {
+        if (dots[i].x > w) dots[i].x = Math.random() * w;
+        if (dots[i].y > h) dots[i].y = Math.random() * h;
+      }
     }
+
+    function burst(x, y, count) {
+      for (var c = 0; c < count; c++) {
+        var ang = Math.random() * 6.2832;
+        var sp = 0.7 + Math.random() * 2.2;
+        bursts.push({
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp,
+          life: 1,
+          r: 1 + Math.random() * 1.8
+        });
+      }
+    }
+
     function draw() {
       ctx.clearRect(0, 0, w, h);
-      var i, j, a, b, d;
+      var i, j, a, b, d, mdx, mdy, md;
+      var lineDistance = 110;
+      var mouseDistance = 170;
+
       for (i = 0; i < dots.length; i++) {
         a = dots[i];
+
         if (!reduce) {
-          a.x += a.vx; a.y += a.vy;
-          if (a.x < 0 || a.x > w) a.vx *= -1;
-          if (a.y < 0 || a.y > h) a.vy *= -1;
+          a.x += a.vx;
+          a.y += a.vy;
+
+          if (a.x < 0) { a.x = 0; a.vx *= -1; }
+          if (a.x > w) { a.x = w; a.vx *= -1; }
+          if (a.y < 0) { a.y = 0; a.vy *= -1; }
+          if (a.y > h) { a.y = h; a.vy *= -1; }
+
+          if (mouse.active) {
+            mdx = mouse.x - a.x;
+            mdy = mouse.y - a.y;
+            md = Math.hypot(mdx, mdy);
+            if (md < mouseDistance && md > 0.001) {
+              var force = (1 - md / mouseDistance) * 0.075;
+              a.vx += (mdx / md) * force;
+              a.vy += (mdy / md) * force;
+            }
+          }
+
+          a.vx = a.vx * 0.992 + (a.vx >= 0 ? 0.002 : -0.002);
+          a.vy = a.vy * 0.992 + (a.vy >= 0 ? 0.002 : -0.002);
+          a.vx = Math.max(-0.85, Math.min(0.85, a.vx));
+          a.vy = Math.max(-0.85, Math.min(0.85, a.vy));
         }
+
         for (j = i + 1; j < dots.length; j++) {
-          b = dots[j]; d = Math.hypot(a.x - b.x, a.y - b.y);
-          if (d < 110) {
-            ctx.strokeStyle = 'rgba(157,185,255,' + (0.22 * (1 - d / 110)).toFixed(3) + ')';
-            ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          b = dots[j];
+          d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < lineDistance) {
+            ctx.strokeStyle = 'rgba(157,185,255,' + (0.24 * (1 - d / lineDistance)).toFixed(3) + ')';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
           }
         }
-        ctx.fillStyle = 'rgba(157,185,255,.75)';
-        ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 6.2832); ctx.fill();
+
+        if (mouse.active) {
+          mdx = mouse.x - a.x;
+          mdy = mouse.y - a.y;
+          md = Math.hypot(mdx, mdy);
+          if (md < mouseDistance) {
+            ctx.strokeStyle = 'rgba(72,143,255,' + (0.42 * (1 - md / mouseDistance)).toFixed(3) + ')';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.stroke();
+          }
+        }
+
+        ctx.fillStyle = 'rgba(157,185,255,.88)';
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, a.r, 0, 6.2832);
+        ctx.fill();
       }
+
+      if (mouse.active) {
+        ctx.fillStyle = 'rgba(72,143,255,.18)';
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 8, 0, 6.2832);
+        ctx.fill();
+      }
+
       for (i = bursts.length - 1; i >= 0; i--) {
-        b = bursts[i]; b.life -= 0.025;
-        if (b.life <= 0) { bursts.splice(i, 1); continue; }
-        b.x += b.vx; b.y += b.vy;
+        b = bursts[i];
+        b.life -= 0.022;
+        if (b.life <= 0) {
+          bursts.splice(i, 1);
+          continue;
+        }
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vx *= 0.985;
+        b.vy *= 0.985;
         ctx.fillStyle = 'rgba(220,231,255,' + b.life.toFixed(2) + ')';
-        ctx.beginPath(); ctx.arc(b.x, b.y, 1.6, 0, 6.2832); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, 6.2832);
+        ctx.fill();
       }
     }
+
     function loop() {
       draw();
       raf = (visible && !document.hidden && !reduce) ? requestAnimationFrame(loop) : 0;
     }
-    function start() { if (!raf && !reduce) raf = requestAnimationFrame(loop); }
-    size(); draw();
+
+    function start() {
+      if (!raf && !reduce) raf = requestAnimationFrame(loop);
+    }
+
+    function updateMouse(e) {
+      var r = host.getBoundingClientRect();
+      mouse.x = e.clientX - r.left;
+      mouse.y = e.clientY - r.top;
+      mouse.active = mouse.x >= 0 && mouse.x <= w && mouse.y >= 0 && mouse.y <= h;
+      if (reduce) draw(); else start();
+    }
+
+    size();
+    draw();
     window.addEventListener('resize', function () { size(); draw(); });
     if ('IntersectionObserver' in window) {
-      new IntersectionObserver(function (e) { visible = e[0].isIntersecting; if (visible) start(); }).observe(host);
+      new IntersectionObserver(function (e) {
+        visible = e[0].isIntersecting;
+        if (visible) start();
+      }).observe(host);
     }
     document.addEventListener('visibilitychange', start);
     start();
-    host.addEventListener('pointerdown', function (e) {
+
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'touch' && e.isPrimary === false) return;
+      updateMouse(e);
+    });
+    host.addEventListener('pointerenter', updateMouse);
+
+    document.addEventListener('pointerdown', function (e) {
+      var bounds = host.getBoundingClientRect();
+      if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) return;
       if (e.target.closest('a, button, input, select, textarea, summary')) return;
-      var r = host.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, k, c;
+      updateMouse(e);
+      var x = mouse.x, y = mouse.y, k, nearest = null, best = 9999;
       for (k = 0; k < dots.length; k++) {
-        if (Math.hypot(dots[k].x - x, dots[k].y - y) < 60) {
-          for (c = 0; c < 14; c++) {
-            var ang = Math.random() * 6.2832, sp = 0.6 + Math.random() * 1.8;
-            bursts.push({ x: dots[k].x, y: dots[k].y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1 });
-          }
-          dots[k].vx += (Math.random() - .5) * .8; dots[k].vy += (Math.random() - .5) * .8;
-          if (reduce) draw(); else start();
-          break;
+        var dist = Math.hypot(dots[k].x - x, dots[k].y - y);
+        if (dist < best) {
+          best = dist;
+          nearest = dots[k];
         }
       }
+      if (nearest && best < 120) {
+        nearest.vx += (Math.random() - 0.5) * 1.2;
+        nearest.vy += (Math.random() - 0.5) * 1.2;
+        burst(nearest.x, nearest.y, 20);
+      } else {
+        burst(x, y, 14);
+      }
+      if (reduce) draw(); else start();
     });
   }
   $$('canvas.particles').forEach(particles);
