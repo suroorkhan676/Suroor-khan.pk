@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://YOUR-SITE.com/sitemap.xml
+Sitemap: https://suroor-khan-pk.pages.dev/sitemap.xml
